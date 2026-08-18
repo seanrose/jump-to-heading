@@ -20,8 +20,9 @@ export function extractHeadings(source: string): HeadingItem[] {
 	const headings: HeadingItem[] = [];
 	const hierarchy: Array<string | undefined> = [];
 	let openFence: OpenFence | undefined;
+	const contentStartLine = findContentStartLine(lines);
 
-	for (let line = 0; line < lines.length; line += 1) {
+	for (let line = contentStartLine; line < lines.length; line += 1) {
 		const value = lines[line] ?? '';
 		const fence = value.match(FENCE);
 
@@ -67,6 +68,20 @@ export function extractHeadings(source: string): HeadingItem[] {
 	return headings;
 }
 
+function findContentStartLine(lines: string[]): number {
+	const firstLine = (lines[0] ?? '').replace(/^\uFEFF/, '');
+	if (!/^ {0,3}---[\t ]*$/.test(firstLine)) {
+		return 0;
+	}
+
+	for (let line = 1; line < lines.length; line += 1) {
+		if (/^ {0,3}(?:---|\.\.\.)[\t ]*$/.test(lines[line] ?? '')) {
+			return line + 1;
+		}
+	}
+	return lines.length;
+}
+
 function isClosingFence(match: RegExpMatchArray, openFence: OpenFence): boolean {
 	const marker = match[1];
 	const trailing = match[2];
@@ -96,7 +111,17 @@ function addHeading(
 
 /** Remove common Markdown decoration while preserving the words users search for. */
 function cleanHeadingText(value: string): string {
-	return value
+	const codeSpans: string[] = [];
+	const withProtectedCode = value.replace(
+		/(`+)(.*?)\1/g,
+		(_match, _ticks: string, content: string) => {
+			const token = `\uE000${codeSpans.length}\uE001`;
+			codeSpans.push(content);
+			return token;
+		},
+	);
+
+	const cleaned = withProtectedCode
 		.replace(
 			/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,
 			(_match, target: string, alias: string | undefined) => alias ?? target,
@@ -107,8 +132,13 @@ function cleanHeadingText(value: string): string {
 		)
 		.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
 		.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-		.replace(/`+([^`]+)`+/g, '$1')
 		.replace(/<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^>]*)?>/g, '')
-		.replace(/[~*_]/g, '')
+		.replace(/(^|[\s([{>])(\*\*|__)(?=\S)(.+?\S)\2(?=$|[\s)\]},.!?:;-])/g, '$1$3')
+		.replace(/(^|[\s([{>])~~(?=\S)(.+?\S)~~(?=$|[\s)\]},.!?:;-])/g, '$1$2')
+		.replace(/(^|[\s([{>])([*_])(?=\S)(.+?\S)\2(?=$|[\s)\]},.!?:;-])/g, '$1$3')
 		.trim();
+
+	return cleaned.replace(/\uE000(\d+)\uE001/g, (_match, index: string) => {
+		return codeSpans[Number(index)] ?? '';
+	});
 }

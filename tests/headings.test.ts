@@ -63,4 +63,31 @@ Installation
 			'Visit <https://obsidian.md> today',
 		);
 	});
+
+	it('ignores YAML frontmatter, including heading-like values', () => {
+		const source = `---
+title: Roadmap
+# Not a heading
+aliases:
+  - Plan
+---
+# Actual heading`;
+
+		expect(extractHeadings(source)).toEqual([
+			{ text: 'Actual heading', level: 1, line: 6, ancestors: [] },
+		]);
+	});
+
+	it('treats an unclosed leading frontmatter block as metadata', () => {
+		const source = '---\ntitle: Roadmap\n# Still metadata';
+		expect(extractHeadings(source)).toEqual([]);
+	});
+
+	it('preserves literal formatting characters and inline code contents', () => {
+		const source =
+			'## API_v2 uses 2 * 3, **bold**, _emphasis_, ~~old~~, and `code_*_~`';
+		expect(extractHeadings(source)[0]?.text).toBe(
+			'API_v2 uses 2 * 3, bold, emphasis, old, and code_*_~',
+		);
+	});
 });

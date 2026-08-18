@@ -7,6 +7,7 @@ import {
 	renderMatches,
 } from 'obsidian';
 import { HeadingItem } from './headings';
+import { findRenderedHeading } from './rendered-headings';
 
 export class JumpToHeadingModal extends FuzzySuggestModal<HeadingItem> {
 	private readonly currentHeadingLine: number | undefined;
@@ -68,7 +69,12 @@ export class JumpToHeadingModal extends FuzzySuggestModal<HeadingItem> {
 
 	onChooseItem(item: HeadingItem): void {
 		if (this.view.getMode() === 'preview' && this.view.file) {
-			void this.app.workspace.openLinkText(`#${item.text}`, this.view.file.path, false);
+			const renderedHeading = findRenderedHeading(this.view.contentEl, this.headings, item);
+			if (renderedHeading) {
+				renderedHeading.scrollIntoView({ behavior: 'auto', block: 'center' });
+			} else {
+				void this.app.workspace.openLinkText(`#${item.text}`, this.view.file.path, false);
+			}
 			return;
 		}
 
