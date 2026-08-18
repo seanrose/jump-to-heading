@@ -1,0 +1,10 @@
+.vscode
+.idea
+*.iml
+node_modules
+main.js
+*.map
+data.json
+.DS_Store
+coverage
+.obsidian-vault-path
