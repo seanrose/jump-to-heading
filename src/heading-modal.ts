@@ -7,6 +7,7 @@ import {
 	renderMatches,
 } from 'obsidian';
 import { HeadingItem } from './headings';
+import { calculateScrollAdjustment, JumpPosition } from './jump-position';
 import { findRenderedHeading } from './rendered-headings';
 
 export class JumpToHeadingModal extends FuzzySuggestModal<HeadingItem> {
@@ -17,6 +18,7 @@ export class JumpToHeadingModal extends FuzzySuggestModal<HeadingItem> {
 		private readonly view: MarkdownView,
 		private readonly editor: Editor,
 		private readonly headings: HeadingItem[],
+		private readonly jumpPosition: JumpPosition,
 	) {
 		super(app);
 		this.modalEl.addClass('jump-to-heading-modal');
@@ -69,12 +71,7 @@ export class JumpToHeadingModal extends FuzzySuggestModal<HeadingItem> {
 
 	onChooseItem(item: HeadingItem): void {
 		if (this.view.getMode() === 'preview' && this.view.file) {
-			const renderedHeading = findRenderedHeading(this.view.contentEl, this.headings, item);
-			if (renderedHeading) {
-				renderedHeading.scrollIntoView({ behavior: 'auto', block: 'center' });
-			} else {
-				void this.app.workspace.openLinkText(`#${item.text}`, this.view.file.path, false);
-			}
+			this.positionRenderedHeading(item);
 			return;
 		}
 
@@ -85,6 +82,72 @@ export class JumpToHeadingModal extends FuzzySuggestModal<HeadingItem> {
 		this.editor.setCursor(position);
 		this.editor.scrollIntoView({ from: position, to: position }, true);
 		this.editor.focus();
+		this.adjustEditorScrollPosition();
+	}
+
+	private adjustEditorScrollPosition(): void {
+		const adjustment = calculateScrollAdjustment(
+			this.jumpPosition,
+			this.view.contentEl.clientHeight,
+		);
+		if (adjustment === 0) {
+			return;
+		}
+
+		const adjust = () => {
+			const scroll = this.editor.getScrollInfo();
+			this.editor.scrollTo(scroll.left, scroll.top + adjustment);
+		};
+		const viewWindow = this.view.contentEl.ownerDocument.defaultView;
+		if (viewWindow) {
+			viewWindow.requestAnimationFrame(adjust);
+		} else {
+			adjust();
+		}
+	}
+
+	private positionRenderedHeading(item: HeadingItem): void {
+		const viewWindow = this.view.contentEl.ownerDocument.defaultView;
+		const position = () => {
+			const heading = findRenderedHeading(this.view.contentEl, this.headings, item);
+			if (!heading) {
+				if (this.view.file) {
+					void this.app.workspace.openLinkText(`#${item.text}`, this.view.file.path, false);
+				}
+				return;
+			}
+
+			heading.scrollIntoView({
+				behavior: 'auto',
+				block: this.jumpPosition === 'top' ? 'start' : 'center',
+			});
+
+			if (this.jumpPosition !== 'balanced') {
+				return;
+			}
+
+			const scrollContainer = findScrollContainer(heading, this.view.contentEl);
+			if (!scrollContainer) {
+				return;
+			}
+
+			const adjustment = calculateScrollAdjustment(
+				this.jumpPosition,
+				scrollContainer.clientHeight,
+			);
+			const adjust = () => scrollContainer.scrollBy({ top: adjustment, behavior: 'auto' });
+			if (viewWindow) {
+				viewWindow.requestAnimationFrame(adjust);
+			} else {
+				adjust();
+			}
+		};
+
+		if (viewWindow) {
+			viewWindow.requestAnimationFrame(position);
+		} else {
+			position();
+		}
 	}
 }
 
@@ -97,4 +160,23 @@ function findCurrentHeadingLine(headings: HeadingItem[], cursorLine: number): nu
 		current = heading.line;
 	}
 	return current;
+}
+
+function findScrollContainer(element: HTMLElement, boundary: HTMLElement): HTMLElement | undefined {
+	const viewWindow = element.ownerDocument.defaultView;
+	let candidate = element.parentElement;
+	while (candidate) {
+		const overflowY = viewWindow?.getComputedStyle(candidate).overflowY ?? '';
+		if (
+			/(auto|scroll|overlay)/.test(overflowY) &&
+			candidate.scrollHeight > candidate.clientHeight
+		) {
+			return candidate;
+		}
+		if (candidate === boundary) {
+			break;
+		}
+		candidate = candidate.parentElement;
+	}
+	return undefined;
 }

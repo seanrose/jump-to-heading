@@ -13,6 +13,14 @@ Open **Jump to Heading: Open heading navigator** from the command palette. The n
 - Ignores heading-like text inside fenced code blocks.
 - Works on desktop and mobile without Node.js or Electron APIs.
 
+## Settings
+
+Choose where a selected heading lands in **Settings → Jump to Heading → Jump position**:
+
+- **Balanced (upper third)** — keeps some preceding context while leaving more room to read forward. This is the default.
+- **Center** — gives the destination equal context above and below.
+- **Top** — maximizes the visible contents of the selected section.
+
 ## Recommended hotkey
 
 Obsidian recommends that community plugins do not claim default hotkeys. To get the intended “Go to Symbol” workflow, open **Settings → Hotkeys**, search for **Open heading navigator**, and assign:
