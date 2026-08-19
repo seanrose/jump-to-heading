@@ -13,6 +13,7 @@ export default defineConfig(
 		'main.js',
 		'package.json',
 		'package-lock.json',
+		'vitest.config.mjs',
 		'tsconfig.json',
 	]),
 	{

@@ -41,6 +41,52 @@ Installation
 		]);
 	});
 
+	it('ignores headings inside HTML comments and raw HTML blocks', () => {
+		const source = `<!--
+# Hidden in a comment
+-->
+<pre>
+## Hidden in preformatted HTML
+</pre>
+<div>
+### Hidden in a block HTML element
+</div>
+
+# Visible`;
+
+		expect(extractHeadings(source)).toEqual([
+			{ text: 'Visible', level: 1, line: 10, ancestors: [] },
+		]);
+	});
+
+	it('parses ATX and setext headings inside blockquotes', () => {
+		const source = `# Document
+> ## Quoted section
+> ### Nested quote
+> Quoted setext
+> --------------
+# Outside`;
+
+		expect(extractHeadings(source)).toEqual([
+			{ text: 'Document', level: 1, line: 0, ancestors: [] },
+			{ text: 'Quoted section', level: 2, line: 1, ancestors: ['Document'] },
+			{ text: 'Nested quote', level: 3, line: 2, ancestors: ['Document', 'Quoted section'] },
+			{ text: 'Quoted setext', level: 2, line: 3, ancestors: ['Document'] },
+			{ text: 'Outside', level: 1, line: 5, ancestors: [] },
+		]);
+	});
+
+	it('ignores fenced headings in blockquotes while preserving source lines', () => {
+		const source = `> \`\`\`
+> # Hidden
+> \`\`\`
+> ## Visible`;
+
+		expect(extractHeadings(source)).toEqual([
+			{ text: 'Visible', level: 2, line: 3, ancestors: [] },
+		]);
+	});
+
 	it('cleans common Markdown formatting for display and search', () => {
 		const source =
 			'## **Install** the [plugin](https://obsidian.md) with `npm` and [[Setup|this guide]]';
